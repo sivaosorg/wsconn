@@ -5,13 +5,11 @@ go 1.20
 require github.com/gin-gonic/gin v1.9.1
 
 require (
-	github.com/BurntSushi/toml v1.3.2 // indirect
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/natefinch/lumberjack v2.0.0+incompatible // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/sivaosorg/govm v1.2.0
-	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
+	github.com/sivaosorg/govm v1.2.3
 )
 
 require (
