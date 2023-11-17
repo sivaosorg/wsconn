@@ -28,6 +28,7 @@ func NewWebsocket() *Websocket {
 	ws.SetConfig(*conf)
 	ws.SetUpgrader(wsUpgrader)
 	ws.SetAllowCloseConn(false)
+	ws.SetRegisteredTopics(make(map[string]bool))
 	return ws
 }
 
@@ -53,6 +54,11 @@ func (ws *Websocket) SetUpgrader(value websocket.Upgrader) *Websocket {
 
 func (ws *Websocket) SetAllowCloseConn(value bool) *Websocket {
 	ws.AllowCloseConn = value
+	return ws
+}
+
+func (ws *Websocket) SetRegisteredTopics(value map[string]bool) *Websocket {
+	ws.RegisteredTopics = value
 	return ws
 }
 

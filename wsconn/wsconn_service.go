@@ -1,10 +1,13 @@
 package wsconn
 
 import (
+	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/sivaosorg/govm/entity"
 	"github.com/sivaosorg/govm/wsconnx"
 )
 
@@ -15,10 +18,11 @@ type WebsocketService interface {
 	AddSubscriber(conn *websocket.Conn, subscription wsconnx.WsConnSubscription)
 	SubscribeMessage(c *gin.Context)
 	BroadcastMessage(message wsconnx.WsConnMessagePayload)
+	RegisterTopic(c *gin.Context)
 }
 
 type websocketServiceImpl struct {
-	wsConf *Websocket `json:"-"`
+	wsConf *Websocket
 }
 
 func NewWebsocketService(wsConf *Websocket) WebsocketService {
@@ -113,4 +117,27 @@ func (ws *websocketServiceImpl) BroadcastMessage(message wsconnx.WsConnMessagePa
 	if channel, ok := ws.wsConf.Broadcast[message.Topic]; ok {
 		channel <- message
 	}
+}
+
+func (ws *websocketServiceImpl) RegisterTopic(c *gin.Context) {
+	ws.wsConf.Mutex.Lock()
+	defer ws.wsConf.Mutex.Unlock()
+	response := entity.NewResponseEntity()
+	var subscription wsconnx.WsConnSubscription
+	if err := c.ShouldBindJSON(&subscription); err != nil {
+		response.SetStatusCode(http.StatusBadRequest).SetError(err).SetMessage(err.Error())
+		c.JSON(response.StatusCode, response)
+		return
+	}
+	if _, ok := ws.wsConf.RegisteredTopics[subscription.Topic]; ok {
+		response.SetStatusCode(http.StatusOK).SetMessage(fmt.Sprintf("Topic %s already registered", subscription.Topic)).SetData(subscription)
+		c.JSON(response.StatusCode, response)
+		return
+	}
+	ws.wsConf.RegisteredTopics[subscription.Topic] = true
+	ws.wsConf.Broadcast[subscription.Topic] = make(chan wsconnx.WsConnMessagePayload)
+	go ws.Run(subscription.Topic)
+	response.SetStatusCode(http.StatusOK).SetMessage(fmt.Sprintf("Topic %s registered successfully", subscription.Topic)).SetData(subscription)
+	c.JSON(response.StatusCode, response)
+	return
 }
