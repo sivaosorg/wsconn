@@ -22,46 +22,50 @@ var (
 )
 
 func NewWebsocket() *Websocket {
-	ws := &Websocket{}
-	ws.SetBroadcast(make(map[string]chan wsconnx.WsConnMessagePayload))
-	ws.SetSubscribers(make(map[*websocket.Conn]wsconnx.WsConnSubscription))
-	ws.SetConfig(*conf)
-	ws.SetUpgrader(wsUpgrader)
-	ws.SetAllowCloseConn(false)
-	ws.SetRegisteredTopics(make(map[string]bool))
-	return ws
+	w := &Websocket{}
+	w.SetBroadcast(make(map[string]chan wsconnx.WsConnMessagePayload))
+	w.SetSubscribers(make(map[*websocket.Conn]wsconnx.WsConnSubscription))
+	w.SetOption(*conf)
+	w.SetUpgrader(wsUpgrader)
+	w.SetEnabledClosure(false)
+	w.SetTopics(make(map[string]bool))
+	return w
 }
 
-func (ws *Websocket) SetBroadcast(value map[string]chan wsconnx.WsConnMessagePayload) *Websocket {
-	ws.Broadcast = value
-	return ws
+func (w *Websocket) SetBroadcast(value map[string]chan wsconnx.WsConnMessagePayload) *Websocket {
+	w.broadcast = value
+	return w
 }
 
-func (ws *Websocket) SetSubscribers(value map[*websocket.Conn]wsconnx.WsConnSubscription) *Websocket {
-	ws.Subscribers = value
-	return ws
+func (w *Websocket) SetSubscribers(value map[*websocket.Conn]wsconnx.WsConnSubscription) *Websocket {
+	w.subscribers = value
+	return w
 }
 
-func (ws *Websocket) SetConfig(value wsconnx.WsConnOptionConfig) *Websocket {
-	ws.Config = value
-	return ws
+func (w *Websocket) SetOption(value wsconnx.WsConnOptionConfig) *Websocket {
+	w.Option = value
+	return w
 }
 
-func (ws *Websocket) SetUpgrader(value websocket.Upgrader) *Websocket {
-	ws.Upgrader = value
-	return ws
+func (w *Websocket) SetUpgrader(value websocket.Upgrader) *Websocket {
+	w.upgrader = value
+	return w
 }
 
-func (ws *Websocket) SetAllowCloseConn(value bool) *Websocket {
-	ws.AllowCloseConn = value
-	return ws
+func (w *Websocket) Upgrader() websocket.Upgrader {
+	return w.upgrader
 }
 
-func (ws *Websocket) SetRegisteredTopics(value map[string]bool) *Websocket {
-	ws.RegisteredTopics = value
-	return ws
+func (w *Websocket) SetEnabledClosure(value bool) *Websocket {
+	w.IsEnabledClosure = value
+	return w
 }
 
-func (ws *Websocket) Json() string {
-	return utils.ToJson(ws)
+func (w *Websocket) SetTopics(value map[string]bool) *Websocket {
+	w.Topics = value
+	return w
+}
+
+func (w *Websocket) Json() string {
+	return utils.ToJson(w)
 }

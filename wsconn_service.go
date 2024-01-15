@@ -33,15 +33,15 @@ func NewWebsocketService(wsConf *Websocket) WebsocketService {
 }
 
 func (ws *websocketServiceImpl) Run(topic string) {
-	channel, ok := ws.wsConf.Broadcast[topic]
+	channel, ok := ws.wsConf.broadcast[topic]
 	if !ok {
 		_logger.Warn("Topic not found: %v", topic)
 		return
 	}
 	for {
 		message := <-channel
-		ws.wsConf.Mutex.Lock()
-		for subscriber, subscription := range ws.wsConf.Subscribers {
+		ws.wsConf.mutex.Lock()
+		for subscriber, subscription := range ws.wsConf.subscribers {
 			if subscription.Topic == topic {
 				err := ws.WriteMessage(subscriber, message)
 				if err != nil {
@@ -50,28 +50,28 @@ func (ws *websocketServiceImpl) Run(topic string) {
 				}
 			}
 		}
-		ws.wsConf.Mutex.Unlock()
+		ws.wsConf.mutex.Unlock()
 	}
 }
 
 func (ws *websocketServiceImpl) WriteMessage(conn *websocket.Conn, message wsconnx.WsConnMessagePayload) error {
 	message.SetGenesisTimestamp(time.Now())
-	conn.SetWriteDeadline(time.Now().Add(ws.wsConf.Config.WriteWait))
+	conn.SetWriteDeadline(time.Now().Add(ws.wsConf.Option.WriteWait))
 	return conn.WriteJSON(message)
 }
 
 func (ws *websocketServiceImpl) CloseSubscriber(conn *websocket.Conn) {
 	conn.Close()
-	delete(ws.wsConf.Subscribers, conn)
+	delete(ws.wsConf.subscribers, conn)
 }
 
 func (ws *websocketServiceImpl) AddSubscriber(conn *websocket.Conn, subscription wsconnx.WsConnSubscription) {
-	ws.wsConf.Mutex.Lock()
-	defer ws.wsConf.Mutex.Unlock()
+	ws.wsConf.mutex.Lock()
+	defer ws.wsConf.mutex.Unlock()
 	if conn != nil {
-		ws.wsConf.Subscribers[conn] = subscription
-		if _, ok := ws.wsConf.Broadcast[subscription.Topic]; !ok {
-			ws.wsConf.Broadcast[subscription.Topic] = make(chan wsconnx.WsConnMessagePayload)
+		ws.wsConf.subscribers[conn] = subscription
+		if _, ok := ws.wsConf.broadcast[subscription.Topic]; !ok {
+			ws.wsConf.broadcast[subscription.Topic] = make(chan wsconnx.WsConnMessagePayload)
 			go ws.Run(subscription.Topic)
 		}
 	}
@@ -80,7 +80,7 @@ func (ws *websocketServiceImpl) AddSubscriber(conn *websocket.Conn, subscription
 // Parse user ID and desired topic from the WebSocket message
 // Read incoming messages, but ignore them as we handle sending only
 func (ws *websocketServiceImpl) SubscribeMessage(c *gin.Context) {
-	conn, err := ws.wsConf.Upgrader.Upgrade(c.Writer, c.Request, nil)
+	conn, err := ws.wsConf.upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		_logger.Error("An error occurred while upgrading connection", err)
 		return
@@ -92,11 +92,11 @@ func (ws *websocketServiceImpl) SubscribeMessage(c *gin.Context) {
 		return
 	}
 	ws.AddSubscriber(conn, subscription)
-	if ws.wsConf.AllowCloseConn {
-		conn.SetReadLimit(int64(ws.wsConf.Config.MaxMessageSize))
-		conn.SetReadDeadline(time.Now().Add(ws.wsConf.Config.PongWait))
+	if ws.wsConf.IsEnabledClosure {
+		conn.SetReadLimit(int64(ws.wsConf.Option.MaxMessageSize))
+		conn.SetReadDeadline(time.Now().Add(ws.wsConf.Option.PongWait))
 		conn.SetPongHandler(func(string) error {
-			conn.SetReadDeadline(time.Now().Add(ws.wsConf.Config.PongWait))
+			conn.SetReadDeadline(time.Now().Add(ws.wsConf.Option.PongWait))
 			return nil
 		})
 	}
@@ -112,16 +112,16 @@ func (ws *websocketServiceImpl) SubscribeMessage(c *gin.Context) {
 
 // Find the channel for the specific topic and send the message to it
 func (ws *websocketServiceImpl) BroadcastMessage(message wsconnx.WsConnMessagePayload) {
-	ws.wsConf.Mutex.Lock()
-	defer ws.wsConf.Mutex.Unlock()
-	if channel, ok := ws.wsConf.Broadcast[message.Topic]; ok {
+	ws.wsConf.mutex.Lock()
+	defer ws.wsConf.mutex.Unlock()
+	if channel, ok := ws.wsConf.broadcast[message.Topic]; ok {
 		channel <- message
 	}
 }
 
 func (ws *websocketServiceImpl) RegisterTopic(c *gin.Context) {
-	ws.wsConf.Mutex.Lock()
-	defer ws.wsConf.Mutex.Unlock()
+	ws.wsConf.mutex.Lock()
+	defer ws.wsConf.mutex.Unlock()
 	response := entity.NewResponseEntity()
 	var subscription wsconnx.WsConnSubscription
 	if err := c.ShouldBindJSON(&subscription); err != nil {
@@ -129,13 +129,13 @@ func (ws *websocketServiceImpl) RegisterTopic(c *gin.Context) {
 		c.JSON(response.StatusCode, response)
 		return
 	}
-	if _, ok := ws.wsConf.RegisteredTopics[subscription.Topic]; ok {
+	if _, ok := ws.wsConf.Topics[subscription.Topic]; ok {
 		response.SetStatusCode(http.StatusOK).SetMessage(fmt.Sprintf("Topic %s already registered", subscription.Topic)).SetData(subscription)
 		c.JSON(response.StatusCode, response)
 		return
 	}
-	ws.wsConf.RegisteredTopics[subscription.Topic] = true
-	ws.wsConf.Broadcast[subscription.Topic] = make(chan wsconnx.WsConnMessagePayload)
+	ws.wsConf.Topics[subscription.Topic] = true
+	ws.wsConf.broadcast[subscription.Topic] = make(chan wsconnx.WsConnMessagePayload)
 	go ws.Run(subscription.Topic)
 	response.SetStatusCode(http.StatusOK).SetMessage(fmt.Sprintf("Topic %s registered successfully", subscription.Topic)).SetData(subscription)
 	c.JSON(response.StatusCode, response)
