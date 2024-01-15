@@ -11,7 +11,7 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/natefinch/lumberjack v2.0.0+incompatible // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/sivaosorg/govm v1.2.8
+	github.com/sivaosorg/govm v1.2.9
 )
 
 require (
